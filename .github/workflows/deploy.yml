@@ -36,10 +36,10 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy:
+  trigger:
     needs: build
     runs-on: ubuntu-latest
-    if: needs.build.result == 'success'
+    if: always()
 
     steps:
       - name: Trigger deploy
@@ -52,6 +52,7 @@ jobs:
               "ref": "main",
               "inputs": {
                 "service": "cafofo-transcribe",
+                "build_result": "${{ needs.build.result }}",
                 "actor": "${{ github.actor }}",
                 "branch": "${{ github.ref_name }}",
                 "commit": ${{ toJson(github.event.head_commit.message) }}
