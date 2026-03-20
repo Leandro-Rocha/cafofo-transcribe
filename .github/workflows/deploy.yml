@@ -1,0 +1,107 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  notify-start:
+    runs-on: [self-hosted, casaos]
+    steps:
+      - name: Notify build started
+        env:
+          NOTIFY_GROUP_ID: ${{ secrets.NOTIFY_GROUP_ID }}
+        run: |
+          [ -z "$NOTIFY_GROUP_ID" ] && exit 0
+          jq -n \
+            --arg actor "${{ github.actor }}" \
+            --arg branch "${{ github.ref_name }}" \
+            --arg commit "$(echo '${{ github.event.head_commit.message }}' | head -1)" \
+            --arg status "🏗️ Build iniciado" \
+            --arg service "${{ github.event.repository.name }}" \
+            --arg groupId "$NOTIFY_GROUP_ID" \
+            '{actor: $actor, branch: $branch, commit: $commit, status: $status, service: $service, groupId: $groupId}' | \
+          curl -s -X POST http://192.168.0.220:3010/notify/deploy \
+            -H "Content-Type: application/json" \
+            -d @- || true
+
+  build:
+    needs: notify-start
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lowercase owner
+        run: echo "OWNER=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ env.OWNER }}/cafofo-transcribe:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    runs-on: [self-hosted, casaos]
+    if: always()
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        if: needs.build.result == 'success'
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Deploy
+        id: deploy
+        if: needs.build.result == 'success'
+        run: |
+          docker compose -f docker-compose.casaos.yml pull
+          docker compose -f docker-compose.casaos.yml up -d --remove-orphans
+
+      - name: Notify
+        if: always()
+        env:
+          NOTIFY_GROUP_ID: ${{ secrets.NOTIFY_GROUP_ID }}
+        run: |
+          [ -z "$NOTIFY_GROUP_ID" ] && exit 0
+          BUILD="${{ needs.build.result }}"
+          DEPLOY="${{ steps.deploy.outcome }}"
+
+          if [ "$BUILD" != "success" ]; then
+            STATUS="❌ Build falhou"
+          elif [ "$DEPLOY" = "success" ]; then
+            STATUS="✅ Deploy concluído"
+          else
+            STATUS="⚠️ Build ok, mas o deploy falhou"
+          fi
+
+          sleep 5
+          jq -n \
+            --arg actor "${{ github.actor }}" \
+            --arg branch "${{ github.ref_name }}" \
+            --arg commit "$(git log -1 --pretty='%s')" \
+            --arg status "$STATUS" \
+            --arg service "${{ github.event.repository.name }}" \
+            --arg groupId "$NOTIFY_GROUP_ID" \
+            '{actor: $actor, branch: $branch, commit: $commit, status: $status, service: $service, groupId: $groupId}' | \
+          curl -s -X POST http://192.168.0.220:3010/notify/deploy \
+            -H "Content-Type: application/json" \
+            -d @- || true
