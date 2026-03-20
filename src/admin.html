@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cafofo Transcribe</title>
+  <style>
+    :root {
+      --bg:       #F5F3EF;
+      --surface:  #FFFFFF;
+      --surface2: #F9F7F4;
+      --border:   #E6E1D8;
+      --border2:  #EDE9E2;
+      --text:     #1A1410;
+      --text2:    #6B5E52;
+      --muted:    #ADA090;
+      --green:    #1B5E3A;
+      --green2:   #217A4A;
+      --green-bg: #E6F2EB;
+      --amber:    #904A07;
+      --amber-bg: #FDF0DF;
+      --red:      #991818;
+      --red-bg:   #FEECEC;
+      --r:        12px;
+      --r-sm:     8px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; -webkit-font-smoothing: antialiased;
+    }
+    #app { max-width: 440px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+
+    header {
+      height: 50px; background: var(--surface); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; padding: 0 14px; gap: 9px;
+      position: sticky; top: 0; z-index: 30;
+    }
+    .logo-mark {
+      width: 26px; height: 26px; background: #6D28D9; border-radius: 7px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .logo-mark svg { width: 14px; height: 14px; fill: #fff; }
+    .logo-text { font-size: 12.5px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; flex: 1; }
+
+    nav {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      display: flex; position: sticky; top: 50px; z-index: 29; padding: 0 10px;
+    }
+    .tab {
+      background: none; border: none; border-bottom: 2px solid transparent;
+      padding: 10px 10px 8px; font-size: 11px; font-weight: 600;
+      letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+      cursor: pointer; transition: color .15s, border-color .15s;
+    }
+    .tab.active { color: var(--green); border-bottom-color: var(--green); }
+    .tab:hover:not(.active) { color: var(--text2); }
+
+    main { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+    .page { display: none; flex-direction: column; gap: 10px; animation: fadeUp .12s ease; }
+    .page.active { display: flex; }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(5px) } to { opacity:1; transform:translateY(0) } }
+
+    .card { background: var(--surface); border-radius: var(--r); border: 1px solid var(--border); overflow: hidden; }
+    .card-head { display: flex; align-items: center; gap: 8px; padding: 10px 13px 8px; border-bottom: 1px solid var(--border2); }
+    .ci { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .ci svg { width: 12px; height: 12px; }
+    .ci-g { background: var(--green-bg); } .ci-g svg { fill: var(--green); }
+    .ci-b { background: #DBEAFE; } .ci-b svg { fill: #1D4ED8; }
+    .ci-p { background: #EDE9FE; } .ci-p svg { fill: #6D28D9; }
+    .ci-a { background: var(--amber-bg); } .ci-a svg { fill: var(--amber); }
+    .card-title { font-size: 11px; font-weight: 600; color: var(--text2); letter-spacing: 0.04em; text-transform: uppercase; }
+    .card-empty { padding: 18px 13px; text-align: center; color: var(--muted); font-size: 12.5px; }
+
+    .row { display: flex; align-items: center; gap: 10px; padding: 9px 13px; border-bottom: 1px solid var(--border2); transition: background .1s; }
+    .row:last-child { border-bottom: none; }
+    .avatar { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 800; color: #fff; flex-shrink: 0; }
+    .row-info { flex: 1; min-width: 0; }
+    .row-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row-sub { font-size: 10px; color: var(--muted); font-family: 'SF Mono', 'Fira Code', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+
+    .toggle { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .slider { position: absolute; inset: 0; background: #DDD7CC; border-radius: 22px; cursor: pointer; transition: background .2s; }
+    .slider::before { content: ''; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform .2s cubic-bezier(.34,1.56,.64,1); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+    input:checked + .slider { background: var(--green2); }
+    input:checked + .slider::before { transform: translateX(18px); }
+
+    .field { padding: 11px 13px; display: flex; flex-direction: column; gap: 6px; }
+    .field + .field { border-top: 1px solid var(--border2); }
+    .field-row { display: flex; gap: 7px; align-items: stretch; }
+
+    .select-wrap { flex: 1; position: relative; min-width: 0; }
+    .select-wrap::after { content: ''; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid var(--muted); pointer-events: none; }
+    select { width: 100%; background: var(--bg); border: 1.5px solid var(--border); color: var(--text); padding: 7px 28px 7px 9px; border-radius: var(--r-sm); font-size: 13px; outline: none; font-family: inherit; -webkit-appearance: none; appearance: none; transition: border-color .15s, box-shadow .15s; cursor: pointer; }
+    select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(27,94,58,.1); }
+
+    input[type=password] { width: 100%; background: var(--bg); border: 1.5px solid var(--border); color: var(--text); padding: 7px 9px; border-radius: var(--r-sm); font-size: 13px; outline: none; font-family: inherit; transition: border-color .15s, box-shadow .15s; }
+    input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(27,94,58,.1); background: #fff; }
+
+    .btn { border: none; border-radius: var(--r-sm); padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; font-family: inherit; letter-spacing: .01em; transition: transform .1s, filter .1s; flex-shrink: 0; }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--green); color: #fff; }
+    .btn-primary:hover { filter: brightness(1.1); }
+    .btn-sm { padding: 6px 12px; font-size: 11.5px; }
+
+    .current-strip { display: flex; justify-content: space-between; align-items: center; padding: 7px 13px; background: var(--surface2); border-top: 1px solid var(--border2); font-size: 11.5px; }
+    .current-strip .cs-label { color: var(--muted); }
+    .current-strip .cs-value { color: var(--text); font-weight: 500; max-width: 60%; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .status-row { display: flex; align-items: center; gap: 6px; padding: 8px 13px; border-top: 1px solid var(--border2); background: var(--surface2); font-size: 11.5px; }
+    .pip { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .pip-ok { background: var(--green2); }
+    .pip-err { background: var(--red); }
+    .status-row .sr-label { color: var(--muted); }
+    .status-row .sr-value { color: var(--text); font-weight: 500; margin-left: 2px; }
+
+    .hint { padding: 7px 13px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--border2); line-height: 1.6; }
+
+    #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(6px); background: rgba(26,20,16,.88); backdrop-filter: blur(10px); color: #fff; padding: 7px 16px; border-radius: 20px; font-size: 12px; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s; white-space: nowrap; z-index: 99; }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24"><path d="M9 2C6.24 2 4 4.24 4 7v1H2v13h13v-2h5V2H9zm8 17H4V10h13v9zM9 9V7c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9zm11 7h-3V10h1V7c0-2.76-2.24-5-5-5S8 4.24 8 7v3H5V9h1V7c0-3.31 2.69-6 6-6s6 2.69 6 6v2h1v10z"/></svg>
+    </div>
+    <span class="logo-text">Cafofo Transcribe</span>
+  </header>
+
+  <nav>
+    <button class="tab active" data-page="transcricoes">Transcrições</button>
+    <button class="tab" data-page="config">Ajustes</button>
+  </nav>
+
+  <main>
+
+    <!-- ── TRANSCRIÇÕES ── -->
+    <div class="page active" id="page-transcricoes">
+
+      <div class="card">
+        <div class="card-head">
+          <div class="ci ci-g">
+            <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+          </div>
+          <span class="card-title">Destino das transcrições</span>
+        </div>
+        <div class="field">
+          <div class="field-row">
+            <div class="select-wrap">
+              <select id="inbox-select"><option value="">Escolha um grupo…</option></select>
+            </div>
+            <button class="btn btn-primary btn-sm" id="inbox-save">Salvar</button>
+          </div>
+        </div>
+        <div class="current-strip">
+          <span class="cs-label">Atual</span>
+          <span class="cs-value" id="inbox-current">não configurado</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="ci ci-b">
+            <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+          </div>
+          <span class="card-title">Remetentes monitorados</span>
+        </div>
+        <div id="senders-list"></div>
+        <div class="hint">Aparecem conforme enviam mensagens nos grupos.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="ci ci-p">
+            <svg viewBox="0 0 24 24"><path d="M21 3L3 10.53v.98l6.84 2.65L12.48 21h.98L21 3z"/></svg>
+          </div>
+          <span class="card-title">Encaminhar para transcrever</span>
+        </div>
+        <div id="autotranscribe-list"></div>
+      </div>
+
+    </div>
+
+    <!-- ── AJUSTES ── -->
+    <div class="page" id="page-config">
+
+      <div class="card">
+        <div class="card-head">
+          <div class="ci ci-a">
+            <svg viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+          </div>
+          <span class="card-title">Groq API Key</span>
+        </div>
+        <div class="field">
+          <div class="field-row">
+            <input type="password" id="groq-input" placeholder="gsk_…" style="flex:1">
+            <button class="btn btn-primary btn-sm" id="groq-save">Salvar</button>
+          </div>
+        </div>
+        <div class="status-row">
+          <div class="pip pip-err" id="groq-pip"></div>
+          <span class="sr-label">Status</span>
+          <span class="sr-value" id="groq-status">Não configurada</span>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  const PALETTE = ['#2563EB','#7C3AED','#DB2777','#D97706','#0891B2','#059669','#EA580C','#4F46E5','#0D9488','#DC2626'];
+  function avatarColor(name) { let h=0; for(const c of name) h=(h*31+c.charCodeAt(0))>>>0; return PALETTE[h%PALETTE.length]; }
+  function initials(name) { return name.split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?'; }
+
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('page-'+btn.dataset.page).classList.add('active');
+    };
+  });
+
+  let groupsCache = [], enabledCache = new Set();
+
+  async function loadAll() {
+    const [groups, enabled] = await Promise.all([
+      fetch('/groups').then(r=>r.json()).catch(()=>[]),
+      fetch('/autotranscribe').then(r=>r.json()).catch(()=>[]),
+    ]);
+    groupsCache = groups;
+    enabledCache = new Set(enabled);
+    renderAutotranscribe();
+    renderInboxSelect();
+    renderSenders();
+  }
+
+  function renderAutotranscribe() {
+    const el = document.getElementById('autotranscribe-list');
+    el.innerHTML = '';
+    if (!groupsCache.length) { el.innerHTML = '<div class="card-empty">Nenhum grupo disponível</div>'; return; }
+    groupsCache.forEach(g => {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `
+        <div class="avatar" style="background:${avatarColor(g.name)}">${initials(g.name)}</div>
+        <div class="row-info"><div class="row-name">${g.name}</div></div>
+        <label class="toggle"><input type="checkbox" ${enabledCache.has(g.id)?'checked':''}><span class="slider"></span></label>`;
+      row.querySelector('input').onchange = async e => {
+        const id = encodeURIComponent(g.id);
+        if (e.target.checked) { await fetch(`/autotranscribe/${id}`,{method:'POST'}); enabledCache.add(g.id); toast('Ativado: '+g.name); }
+        else { await fetch(`/autotranscribe/${id}`,{method:'DELETE'}); enabledCache.delete(g.id); toast('Desativado: '+g.name); }
+      };
+      el.appendChild(row);
+    });
+  }
+
+  async function renderInboxSelect() {
+    const sel = document.getElementById('inbox-select');
+    const cur = document.getElementById('inbox-current');
+    const { jid } = await fetch('/config/inbox').then(r=>r.json()).catch(()=>({}));
+    sel.innerHTML = '<option value="">Escolha um grupo…</option>';
+    groupsCache.forEach(g => sel.appendChild(new Option(g.name, g.id, false, g.id===jid)));
+    const found = groupsCache.find(g=>g.id===jid);
+    cur.textContent = found ? found.name : (jid || 'não configurado');
+  }
+
+  document.getElementById('inbox-save').onclick = async () => {
+    const jid = document.getElementById('inbox-select').value;
+    await fetch('/config/inbox',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jid})});
+    await renderInboxSelect();
+    toast(jid ? 'Destino salvo' : 'Destino removido');
+  };
+
+  async function renderSenders() {
+    const list = await fetch('/senders').then(r=>r.json()).catch(()=>[]);
+    const el = document.getElementById('senders-list');
+    el.innerHTML = '';
+    if (!list.length) { el.innerHTML = '<div class="card-empty">Nenhuma mensagem recebida ainda</div>'; return; }
+    list.forEach(s => {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `
+        <div class="avatar" style="background:${avatarColor(s.name)}">${initials(s.name)}</div>
+        <div class="row-info">
+          <div class="row-name">${s.name}</div>
+          <div class="row-sub">${s.jid}</div>
+        </div>
+        <label class="toggle"><input type="checkbox" ${s.monitored?'checked':''}><span class="slider"></span></label>`;
+      row.querySelector('input').onchange = async e => {
+        if (e.target.checked) {
+          await fetch('/senders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jid:s.jid,name:s.name})});
+          toast('Monitorando: '+s.name);
+        } else {
+          await fetch(`/senders/${encodeURIComponent(s.jid)}`,{method:'DELETE'});
+          toast('Removido: '+s.name);
+        }
+      };
+      el.appendChild(row);
+    });
+  }
+
+  async function loadGroqStatus() {
+    const { set } = await fetch('/config/groq-key').then(r=>r.json()).catch(()=>({}));
+    document.getElementById('groq-status').textContent = set ? 'Configurada' : 'Não configurada';
+    document.getElementById('groq-pip').className = 'pip ' + (set ? 'pip-ok' : 'pip-err');
+  }
+
+  document.getElementById('groq-save').onclick = async () => {
+    const key = document.getElementById('groq-input').value.trim();
+    await fetch('/config/groq-key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})});
+    document.getElementById('groq-input').value = '';
+    await loadGroqStatus();
+    toast(key ? 'API Key salva' : 'API Key removida');
+  };
+
+  let toastTimer;
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>el.classList.remove('show'), 2500);
+  }
+
+  loadGroqStatus();
+  loadAll();
+</script>
+</body>
+</html>

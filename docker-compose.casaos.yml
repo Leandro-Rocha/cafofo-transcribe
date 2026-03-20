@@ -1,0 +1,14 @@
+services:
+  cafofo-transcribe:
+    image: ghcr.io/leandro-rocha/cafofo-transcribe:latest
+    restart: unless-stopped
+    ports:
+      - "4020:3020"
+    volumes:
+      - db-data:/data
+    environment:
+      ZAP_URL: http://192.168.0.220:3010
+      SELF_URL: http://192.168.0.220:4020
+
+volumes:
+  db-data:
