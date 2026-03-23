@@ -1,6 +1,7 @@
 services:
   cafofo-transcribe:
     image: ghcr.io/leandro-rocha/cafofo-transcribe:latest
+    container_name: cafofo-transcribe
     restart: unless-stopped
     ports:
       - "4020:3020"
