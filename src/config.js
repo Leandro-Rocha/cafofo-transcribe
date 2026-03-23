@@ -13,8 +13,4 @@ function setConfig(key, value) {
   else del.run(key);
 }
 
-function getGroqApiKey() {
-  return process.env.GROQ_API_KEY || getConfig('groq_api_key') || null;
-}
-
-module.exports = { getConfig, setConfig, getGroqApiKey };
+module.exports = { getConfig, setConfig };

@@ -1,9 +1,8 @@
 const express = require('express');
 const path = require('path');
-const { transcribe } = require('./transcribe');
 const autotranscribe = require('./autotranscribe');
 const senders = require('./senders');
-const { getConfig, setConfig, getGroqApiKey } = require('./config');
+const { getConfig, setConfig } = require('./config');
 
 const app = express();
 app.use(express.json({ limit: '25mb' }));
@@ -38,41 +37,32 @@ app.post('/webhook', async (req, res) => {
   res.json({ ok: true }); // respond immediately, process async
 
   const event = req.body;
-  const { type, sender, senderJid, groupId, isMySender, isSelfChat, forwarded, originalSender } = event;
+  const { type, sender, senderJid, groupId, isMySender, isSelfChat, forwarded, originalSender, transcription } = event;
 
   // Track all known senders (from non-own messages)
   if (senderJid && sender && !isMySender) {
     senders.trackSeen(senderJid, sender);
   }
 
-  if (type !== 'audio' || !event.audioBase64) return;
+  if (type !== 'audio' || !transcription) return;
 
-  let shouldTranscribe = false;
+  let shouldForward = false;
   let label = null;
 
   if (isSelfChat) {
-    // Áudio enviado para si mesmo (Mensagens Salvas)
-    shouldTranscribe = true;
+    shouldForward = true;
     label = forwarded && originalSender ? originalSender : null;
   } else if (isMySender && autotranscribe.isEnabled(groupId)) {
-    // Áudio próprio ou encaminhado em grupo habilitado
-    shouldTranscribe = true;
+    shouldForward = true;
     label = forwarded && originalSender ? originalSender : null;
   } else if (senderJid && senders.isMonitored(senderJid)) {
-    // Remetente monitorado
-    shouldTranscribe = true;
+    shouldForward = true;
     label = sender;
   }
 
-  if (!shouldTranscribe) return;
+  if (!shouldForward) return;
 
-  const buffer = Buffer.from(event.audioBase64, 'base64');
-  const text = await transcribe(buffer, event.mimetype).catch((err) => {
-    console.error('[transcribe] erro:', err.message);
-    return null;
-  });
-
-  if (text) await sendToInbox(label, text);
+  await sendToInbox(label, transcription);
 });
 
 // ── Groups (proxied from cafofo-zap) ──
@@ -125,12 +115,6 @@ app.post('/config/inbox', (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/config/groq-key', (_, res) => res.json({ set: !!getGroqApiKey() }));
-app.post('/config/groq-key', (req, res) => {
-  setConfig('groq_api_key', req.body.key || null);
-  res.json({ ok: true });
-});
-
 // ── Health ──
 
 app.get('/health', (_, res) => res.json({ ok: true }));
@@ -153,11 +137,10 @@ async function registerWebhook() {
       await fetch(`${ZAP_URL}/webhooks/${w.id}`, { method: 'DELETE' });
     }
 
-    // Registra ouvindo text (para trackSeen) e audio (para transcrição)
     await fetch(`${ZAP_URL}/webhooks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: webhookUrl, events: ['text', 'audio'] }),
+      body: JSON.stringify({ url: webhookUrl, events: ['text', 'audio'], transcribe: true }),
     });
 
     console.log('[transcribe] webhook registrado em', webhookUrl);
